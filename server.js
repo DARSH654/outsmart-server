@@ -28,17 +28,22 @@ app.post('/process', upload.single('video'), (req, res) => {
   }
 
   const inputPath = req.file.path;
-  const outputPath = path.join('uploads', `processed-${Date.now()}-${req.file.originalname}`);
+  const outputPath = path.join('uploads', `processed-video-${Date.now()}.mp4`);
 
   ffmpeg(inputPath)
     .videoFilters([
-      'scale=iw*1.05:ih*1.05',
+      { filter: 'scale', options: 'trunc(iw*1.05/2)*2:trunc(ih*1.05/2)*2' },
       'eq=brightness=0.015',
       'noise=alls=20:allf=t'
     ])
+    .outputOptions([
+      '-c:v libx264',
+      '-c:a aac',
+      '-movflags +faststart'
+    ])
     .on('end', () => {
-      res.download(outputPath, (err) => {
-        // Cleanup temporary files
+      res.download(outputPath, 'processed-video.mp4', (err) => {
+        // Cleanup uploaded and processed files
         fs.unlink(inputPath, () => {});
         fs.unlink(outputPath, () => {});
       });
@@ -49,7 +54,7 @@ app.post('/process', upload.single('video'), (req, res) => {
       if (fs.existsSync(outputPath)) {
         fs.unlink(outputPath, () => {});
       }
-      res.status(500).json({ error: 'Failed to process video' });
+      res.status(500).json({ error: 'Conversion failed' });
     })
     .save(outputPath);
 });
